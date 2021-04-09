@@ -16,7 +16,7 @@ from detectron2.structures import BoxMode
 
 from .augmentation import RandomCropWithInstance
 from .detection_utils import (annotations_to_instances, build_augmentation,
-                              transform_instance_annotations)
+                              transform_instance_annotations, check_nlos_image_size)
 
 """
 This file contains the default mapping that's applied to "dataset dicts".
@@ -212,3 +212,121 @@ class DatasetMapperWithBasis(DatasetMapper):
             basis_sem_gt = torch.as_tensor(basis_sem_gt.astype("long"))
             dataset_dict["basis_sem"] = basis_sem_gt
         return dataset_dict
+
+class NLOSDatasetMapper(DatasetMapper):
+    """
+    NLOS dataset mapper
+    """
+
+    def __init__(self, cfg, is_train=True):
+        super().__init__(cfg, is_train)
+
+        # Rebuild augmentations
+        logger.info(
+            "Rebuilding the augmentations. The previous augmentations will be overridden."
+        )
+        self.augmentation = build_augmentation(cfg, is_train)
+        self.initial_img_root = cfg.NLOS.INITIAL_IMG_ROOT
+        self.initial_imgs = None
+        self.use_initial_img = cfg.NLOS.USE_INITIAL_IMG
+        if cfg.NLOS.USE_INITIAL_IMG:
+            self.init_laser_imgs = [x for x in glob.glob(osp.join(self.initial_img_root, '*')) if x.find('Avg') != -1]
+            list.sort(self.init_laser_imgs)
+            self.init_laser_imgs = [T.StandardAugInput(utils.read_image(x, format=self.image_format)) for x in self.init_laser_imgs]
+            [aug_init.apply_augmentations(self.augmentations) for aug_init in self.init_laser_imgs]
+
+        """
+        if cfg.INPUT.CROP.ENABLED and is_train:
+            self.augmentation.insert(
+                0,
+                RandomCropWithInstance(
+                    cfg.INPUT.CROP.TYPE,
+                    cfg.INPUT.CROP.SIZE,
+                    cfg.INPUT.CROP.CROP_INSTANCE,
+                ),
+            )
+            logging.getLogger(__name__).info(
+                "Cropping used in training: " + str(self.augmentation[0])
+            )
+
+        # fmt: off
+        self.basis_loss_on       = cfg.MODEL.BASIS_MODULE.LOSS_ON
+        self.ann_set             = cfg.MODEL.BASIS_MODULE.ANN_SET
+        # fmt: on
+        """
+
+    def __call__(self, dataset_dict):
+        """
+        Args:
+            dataset_dict (dict): Metadata of one image, in Detectron2 Dataset format.
+
+        Returns:
+            dict: a format that builtin models in detectron2 accept
+        """
+        dataset_dict = copy.deepcopy(dataset_dict)  # it will be modified by code below
+        # USER: Write your own image loading if it's not from a file
+
+        gt_image = None
+        laser_image = None
+        depth_image = None
+        try:
+            gt_image = utils.read_image(dataset_dict["gt_image"]["name"], format=self.image_format)
+            laser_image = [utils.read_image(x, format=self.image_format) for x in dataset_dict["laser_image"]["name"]]
+            depth_image = utils.read_image(dataset_dict["depth_image"]["name"], format=self.image_format)
+        except:
+            print("OS error for image")
+
+        check_nlos_image_size(dataset_dict, gt_image, 'gt_image')
+        [check_nlos_image_size(dataset_dict, x, 'laser_image') for x in laser_image]
+        check_nlos_image_size(dataset_dict, depth_image, 'depth_image')
+
+        laser_aug_input = [T.StandardAugInput(image) for image in laser_image]
+        #[aug_input.apply_augmentations(self.augmentations) for aug_input in laser_aug_input]
+        for aug_input in laser_aug_input:
+            aug_input = self.augmentations(aug_input)
+
+        if self.use_initial_img:
+            laser_aug_input = [aug_input.image - init.image for aug_input, init in zip(laser_aug_input, self.init_laser_imgs)]
+        else:
+            laser_image = [aug_input.image for aug_input in laser_aug_input]
+
+        image_shape = laser_image[0].shape[:2]  # h, w
+        # Pytorch's dataloader is efficient on torch.Tensor due to shared-memory,
+        # but not efficient on large generic data structures due to the use of pickle & mp.Queue.
+        # Therefore it's important to use torch.Tensor.
+
+        dataset_dict["gt_image"] = torch.as_tensor(np.ascontiguousarray(gt_image.transpose(2, 0, 1)))
+        dataset_dict["depth_image"] = torch.as_tensor(np.ascontiguousarray(depth_image.transpose(2, 0, 1)))
+
+        laser_idx = [[int(idx[2:]) for idx in laser_name.split('.')[0].split('_')[2:]] for laser_name in dataset_dict["laser_image"]["name"]]
+        dataset_dict["laser_idx"] = np.array(laser_idx)
+        dataset_dict["laser_images"] = torch.cat([torch.as_tensor(np.ascontiguousarray(x.transpose(2,0,1))).unsqueeze(0) for x in laser_image], dim=0)
+
+        # Pytorch's dataloader is efficient on torch.Tensor due to shared-memory,
+        # but not efficient on large generic data structures due to the use of pickle & mp.Queue.
+        # Therefore it's important to use torch.Tensor.
+
+        if not self.is_train:
+            dataset_dict.pop("annotations", None)
+            return dataset_dict
+
+        if "annotations" in dataset_dict:
+            # USER: Modify this if you want to keep them for some reason.
+            # USER: Implement additional transformations if you have other types of data
+            annos = [
+                obj 
+                for obj in dataset_dict.pop("annotations")
+                if obj.get("iscrowd", 0) == 0
+            ]
+            instances = annotations_to_instances(
+                annos, image_shape, mask_format=self.instance_mask_format
+            )
+
+            # After transforms such as cropping are applied, the bounding box may no longer
+            # tightly bound the object. As an example, imagine a triangle object
+            # [(0,0), (2,0), (0,2)] cropped by a box [(1,0),(2,2)] (XYXY format). The tight
+            # bounding box of the cropped triangle should be [(1,0),(2,1)], which is not equal to
+            dataset_dict["instances"] = instances
+
+        return dataset_dict
+

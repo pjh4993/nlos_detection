@@ -14,10 +14,11 @@ Therefore, we recommend you to use detectron2 as an library and take
 this file as an example of how to use the library.
 You may want to write your own script with your datasets and other customizations.
 """
-
+ 
 import logging
 import os
 from collections import OrderedDict
+from pynlostools.nlos import NLOS
 import torch
 from torch.nn.parallel import DistributedDataParallel
 
@@ -37,10 +38,10 @@ from detectron2.evaluation import (
 from detectron2.modeling import GeneralizedRCNNWithTTA
 from detectron2.utils.logger import setup_logger
 
-from adet.data.dataset_mapper import DatasetMapperWithBasis
+from adet.data.dataset_mapper import DatasetMapperWithBasis, NLOSDatasetMapper
 from adet.config import get_cfg
 from adet.checkpoint import AdetCheckpointer
-from adet.evaluation import TextEvaluator
+from adet.evaluation import TextEvaluator, NLOSEvaluator
 
 
 class Trainer(DefaultTrainer):
@@ -99,8 +100,11 @@ class Trainer(DefaultTrainer):
         It calls :func:`detectron2.data.build_detection_train_loader` with a customized
         DatasetMapper, which adds categorical labels as a semantic mask.
         """
-        mapper = DatasetMapperWithBasis(cfg, True)
-        return build_detection_train_loader(cfg, mapper=mapper)
+        if cfg.INPUT.NLOS:
+            mapper = NLOSDatasetMapper(cfg, True)
+        else:
+            mapper = DatasetMapperWithBasis(cfg, True)
+        return build_detection_train_loader(cfg, mapper)
 
     @classmethod
     def build_evaluator(cls, cfg, dataset_name, output_folder=None):
@@ -134,6 +138,8 @@ class Trainer(DefaultTrainer):
             return LVISEvaluator(dataset_name, cfg, True, output_folder)
         if evaluator_type == "text":
             return TextEvaluator(dataset_name, cfg, True, output_folder)
+        if evaluator_type == "nlos":
+            return NLOSEvaluator(dataset_name, cfg, True, output_folder)
         if len(evaluator_list) == 0:
             raise NotImplementedError(
                 "no Evaluator for the dataset {} with the type {}".format(

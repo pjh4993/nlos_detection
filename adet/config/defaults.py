@@ -10,6 +10,25 @@ _C.MODEL.BACKBONE.ANTI_ALIAS = False
 _C.MODEL.RESNETS.DEFORM_INTERVAL = 1
 _C.INPUT.HFLIP_TRAIN = True
 _C.INPUT.CROP.CROP_INSTANCE = True
+_C.INPUT.NLOS = False
+
+# ---------------------------------------------------------------------------- #
+# NLOS DETECTOR Configs
+# ---------------------------------------------------------------------------- #
+
+_C.NLOS = CN()
+_C.NLOS.LASER_GRID = 5
+_C.NLOS.USE_INITIAL_IMG = False
+_C.NLOS.INITIAL_IMG_ROOT = 'datasets/nlos/initialization'
+
+_C.MODEL.NLOS_CONVERTER = CN()
+_C.MODEL.NLOS_CONVERTER.NAME = "conv_fc_nlos_converter"
+_C.MODEL.NLOS_CONVERTER.IN_FEATURES = ["p3"]
+_C.MODEL.NLOS_CONVERTER.NUM_CONVS = 2
+_C.MODEL.NLOS_CONVERTER.INT_CONV_CHANNEL = 256
+_C.MODEL.NLOS_CONVERTER.IN_FC_CHANNELS = [1,1,1]
+_C.MODEL.NLOS_CONVERTER.OUT_FC_CHANNELS = [1,1,1]
+_C.MODEL.NLOS_CONVERTER.NORM = "GN"
 
 # ---------------------------------------------------------------------------- #
 # FCOS Head

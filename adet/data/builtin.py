@@ -3,7 +3,10 @@ import os
 from detectron2.data.datasets.register_coco import register_coco_instances
 from detectron2.data.datasets.builtin_meta import _get_builtin_metadata
 
+
 from .datasets.text import register_text_instances
+from .datasets.builtin_meta import _get_builtin_metadata as _get_adet_builtin_metadata
+from .datasets.register_nlos import register_nlos_instances
 
 # register plane reconstruction
 
@@ -24,6 +27,16 @@ _PREDEFINED_SPLITS_TEXT = {
     "syntext1_train": ("syntext1/images", "syntext1/annotations/train.json"),
     "syntext2_train": ("syntext2/images", "syntext2/annotations/train.json"),
     "mltbezier_word_train": ("mlt2017/images","mlt2017/annotations/train.json"),
+}
+
+# ==== Predefined datasets and splits for NLOS ==========
+
+_PREDEFINED_SPLITS_NLOS = {}
+_PREDEFINED_SPLITS_NLOS["nlos"] = {
+    "nlos_2020_train": ("nlos/images", "nlos/annotations/instances_train2020.json"),
+    "nlos_2020_valid": ("nlos/images", "nlos/annotations/instances_valid2020.json"),
+    #"nlos_crop_2020_train": ("nlos/croppedImages", "nlos/annotations/instances_train2020_cropped.json"),
+
 }
 
 metadata_text = {
@@ -49,5 +62,18 @@ def register_all_coco(root="datasets"):
             os.path.join(root, image_root),
         )
 
+def register_all_nlos(root="datasets"):
+    for dataset_name, splits_per_dataset in _PREDEFINED_SPLITS_NLOS.items():
+        for key, (image_root, json_file) in splits_per_dataset.items():
+            # Assume pre-defined datasets live in `./datasets`.
+            register_nlos_instances(
+                key,
+                _get_adet_builtin_metadata(dataset_name),
+                os.path.join(root, json_file) if "://" not in json_file else json_file,
+                os.path.join(root, image_root),
+            )
 
 register_all_coco()
+
+# Register NLOS Laser Image Dataset
+register_all_nlos()
