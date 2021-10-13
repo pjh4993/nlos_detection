@@ -39,4 +39,9 @@ root
 
 ### Model
 
-모델 관련 코드는 adet/modeling/nlos_detector.py를 중심으로 돌아갑니다. configuration파일에서 지정된 backbone 네트워크를 이용해서 laser 이미지를 feature로 뽑은 뒤, 이를 nlos_converter를 이용해서 gt_image와 HW 사이즈가 같게 만들어준 다음, FCOS 스타일의 one-stage object detection을 수행합니다. 
+모델 관련 코드는 adet/modeling/nlos_detector.py를 중심으로 돌아갑니다. configuration파일에서 지정된 backbone 네트워크를 이용해서 laser 이미지를 feature로 뽑은 뒤, 이를 nlos_converter를 이용해서 gt_image와 HW 사이즈가 같게 만들어준 다음, FCOS 스타일의 one-stage object detection을 수행합니다.
+
+configs/NLOS/Base-NLOS.yaml에 있는 configuration을 사용하면, Backbone은 Vovnet을 사용하고 있고, FPN에서는 p5, p6 feature를 사용하고 있습니다.
+
+Box prediction과 loss계산은 FCOS 방식을 이용하고 있습니다. 
+adet/modeling/fcos/fcos.py에서 FCOSHaed의 forward부분에서 box prediction이 이루어 지고, loss 계산은 adet/modeling/fcos/fcos_outputs.py의 losses에서 이루어 집니다.
