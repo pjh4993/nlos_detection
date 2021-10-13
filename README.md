@@ -19,13 +19,27 @@ tools/train_net.py의 argument들은 detectron2의 argument parser를 참고해�
 configs/ 디렉토리 안에는 tools/ 의 script들을 돌릴시 필요한 configuration file 들을 모아놓은 곳 입니다.
 NLOS object detection에 관련된 configuration들은 configs/NLOS 안에 있습니다.
 
-NLOS dataset은 datasets/ 폴더안에 위치해주셔야 합니다. 정확한 경로명은 
+NLOS dataset은 datasets/ 폴더안에 위치해주셔야 합니다. 정확한 경로명은 adet/data/builtin.py 에서 _PREDEFINED_SPLITS_NLOS 를 통해 확인할 수 있습니다.
 
 ### Data Loader
 
-NLOS 데이터셋을 
+NLOS 데이터셋은 COCO와 같은 형식으로 annotation이 구성되어 있습니다. annotation json파일을 읽어서 Dataloader에게 전달해주기 위한 list로 바꿔주는 코드가 adet/data/datasets/nlos.py에 있습니다.
+
+json 파일의 구조는 다음과 같습니다.
+
+```
+root
+|-- image_groups
+|    |
+|    |--[id, group_name, gt_image, laser_image, depthimage, position]
+|-- annotations
+     |
+     |--[id, image_group_id, category_id, area, bbox]
+```
 
 ### Model
+
+
 
 ### Evaluator
 
