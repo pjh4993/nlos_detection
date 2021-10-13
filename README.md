@@ -39,10 +39,4 @@ root
 
 ### Model
 
-
-
-### Evaluator
-
-## Installation
-
-## Quick Start
+모델 관련 코드는 adet/modeling/nlos_detector.py를 중심으로 돌아갑니다. configuration파일에서 지정된 backbone 네트워크를 이용해서 laser 이미지를 feature로 뽑은 뒤, 이를 nlos_converter를 이용해서 gt_image와 HW 사이즈가 같게 만들어준 다음, FCOS 스타일의 one-stage object detection을 수행합니다. 
